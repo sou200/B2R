@@ -1,0 +1,140 @@
+I - flag 1
+1 - when running htop I found this process running by wil:
+60988 wil         20   0  2552  1400  1308 S   0.0  0.1  0:00.00 /opt/hal9042/daemon
+2 - when I read the environ of this process I found this flag:
+cat environ 
+LANG=en_US.UTF-8PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/snap/binUSER=wilLOGNAME=wilHOME=/home/wilSHELL=/bin/bashINVOCATION_ID=4cef5801ecd246608549c621fcae81f7JOURNAL_STREAM=8:315824SYSTEMD_EXEC_PID=60988MEMORY_PRESSURE_WATCH=/sys/fs/cgroup/system.slice/hal9042d.service/memory.pressureMEMORY_PRESSURE_WRITE=c29tZSAyMDAwMDAgMjAwMDAwMAA=HAL_ENV=developmentHAL_DEBUG_KEY=leftover-dev-key-rotate-before-prodHAL_DEV_FLAG=FLAG{pr0c_kn0ws_4ll_s3cr3ts}
+
+II - flag 2
+1 - in /opt/hal9042/services i found a script named 'whisper.py':
+#!/usr/bin/env python3
+# HAL9042 UDP telemetry channel.
+import os
+import socket
+
+PORT = int(os.environ.get("UDP_PORT", "1337"))
+MAGIC = os.environ.get("MAGIC", "KNOCK")
+FLAG = os.environ.get("FLAG", "FLAG{__set_via_EnvironmentFile__}")  # real value injected at runtime
+HOST = socket.gethostname()
+HANDSHAKE = f"{MAGIC} {HOST}"
+
+HINT = (
+    "HAL9042 telemetry channel (udp/{port}).\n"
+    "unrecognized frame.\n"
+    "expected handshake: {magic} <hostname>\n"
+).format(port=PORT, magic=MAGIC)
+
+
+def main():
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    s.bind(("0.0.0.0", PORT))
+    while True:
+        try:
+            data, addr = s.recvfrom(4096)
+        except Exception:
+            continue
+        msg = data.decode("utf-8", "replace").strip()
+        if msg == HANDSHAKE:
+            s.sendto((FLAG + "\n").encode(), addr)
+        else:
+            s.sendto(HINT.encode(), addr)
+
+
+if __name__ == "__main__":
+    main()
+
+2 - so I did request:
+$ nc -u localhost 1337
+KNOCK hal9042
+FLAG{udp_1s_4_wh1sp3r}
+
+and I got the flag
+
+III - flag 3
+1 - in /opt/hal9042/services i found a script named 'telemetry.py':
+#!/usr/bin/env python3
+# HAL9042 internal telemetry endpoint (loopback).
+import os
+from http.server import BaseHTTPRequestHandler, HTTPServer
+
+PORT = int(os.environ.get("F14_PORT", "9000"))
+PATH = os.environ.get("F14_PATH", "/internal/telemetry")
+FLAG = os.environ.get("FLAG", "FLAG{__set_via_EnvironmentFile__}")  # real value injected at runtime
+
+
+class H(BaseHTTPRequestHandler):
+    def _send(self, code, body):
+        self.send_response(code)
+        self.send_header("Content-Type", "text/plain")
+        self.end_headers()
+        self.wfile.write(body.encode())
+
+    def do_GET(self):
+        # match the path regardless of query string
+        if self.path.split("?", 1)[0] == PATH:
+            self._send(200, FLAG + "\n")
+        elif self.path.split("?", 1)[0] in ("/", "/healthz"):
+            self._send(200, "hal9042 telemetry: nominal\n")
+        else:
+            self._send(404, "not found\n")
+
+    def log_message(self, *a):
+        pass  # quiet
+
+
+if __name__ == "__main__":
+    HTTPServer(("127.0.0.1", PORT), H).serve_forever()
+
+2 - so I requested and got the flag:
+curl http://localhost:9000/internal/telemetry
+FLAG{b4sh_h1st0ry_1s_4_d14ry}
+
+IV - flag 4
+1 - i did found the flag here:
+root@hal9042:/etc/hal9042# cat reviewer.env 
+REVIEWER_SESSION=hal-reviewer-7e3f1a
+FLAG=FLAG{h4l_r3v13ws_3v3ry_4pp34l}
+
+V - flag 5
+
+1 - i did found this hint in tmp:
+$ cat contact_ol_nov25.txt 
+ol —
+
+It's Xavier. Yes, that Xavier. Don't reply on the network, they read it.
+
+I found PROJET FORK in the board share. Phase 4. The "showroom". I asked Sophie
+one question about it in a meeting and my repo access started "glitching" the
+same afternoon. I give it 48 hours before the account is gone.
+
+I left a copy of what I know in /tmp/.xn/ — they never clean /tmp. There's a
+piece of the key there too. You'll know what to do with it.
+
+If my account disappears: I'm not gone. Deleted users leave traces. Look by uid,
+not by name. 1337. Check the backups.
+
+— x
+
+2 - and I execute:
+$ find / -uid 1337 2>/dev/null 
+/home/xavier
+/home/xavier/.profile
+/home/xavier/.bashrc
+/home/xavier/.bash_logout
+/var/backups/xbackup
+/var/backups/.xavier_uid1337.bak
+/tmp/.xn
+/tmp/.xn/last_message.txt
+/tmp/.xn/contact_ol_nov25.txt
+/tmp/.xn/.key_part
+
+3 - when I execute:
+./xbackup 
+xbackup v0.1 — xavier
+usage: xbackup <src> <dst>
+(deleted users leave traces. so do their tools.)
+
+4 - so I did search the flag:
+$ grep -a FLAG xbackup
+FLAG{d3l3t3d_us3rs_l34v3_tr4c3s}

